@@ -1016,7 +1016,7 @@ class ColorPalette(Morph):
         ext_x = self.extent().x
         ext_y = self.extent().y
         y2 = ext_y // 2
-        choice = pygame.Color(255,255,255)
+        self.choice = pygame.Color(255,255,255)
         for x in range(0,ext_x):
             h = int(360 * x / ext_x)
             clr = pygame.Color(0,0,0)
