@@ -7,7 +7,7 @@
 #    written by Jens Mönig
 #    jens@moenig.org
 #
-#    version 2009-Nov-06
+#    version 2021-Oct-13
 #
 #    Copyright (C) 2009 by Jens Mönig
 #
@@ -44,7 +44,7 @@ import pygame
 import copy
 import math
 pygame.init()
-version = '2009-Nov-06'
+version = '2021-Oct-13'
 TRANSPARENT = pygame.Color(1, 1, 1)
 
 class Point:
