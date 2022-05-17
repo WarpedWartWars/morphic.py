@@ -14,22 +14,24 @@
 #    Permission is hereby granted, free of charge, to any person
 #    obtaining a copy of this software and associated documentation
 #    files (the "Software"), to deal in the Software without
-#    restriction, including without limitation the rights to use, copy,
-#    modify, merge, publish, distribute, sublicense, and/or sell copies
-#    of the Software, and to permit persons to whom the Software is
-#    furnished to do so, subject to the following conditions:
+#    restriction, including without limitation the rights to use,
+#    copy, modify, merge, publish, distribute, sublicense, and/or
+#    sell copies of the Software, and to permit persons to whom
+#    the Software is furnished to do so, subject to the following
+#    conditions:
 #
 #    The above copyright notice and this permission notice shall be
-#    included in all copies or substantial portions of the Software.
+#    included in all copies or substantial portions of the
+#    Software.
 #
-#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-#    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-#    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-#    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-#    DEALINGS IN THE SOFTWARE.
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+#    KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+#    WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+#    PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+#    COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+#    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 #    yet to implement:
 #    - make World customizable before opening it
@@ -38,18 +40,53 @@
 #    - skinnables
 #    - turtle trails
 #    - better string editing
-#    - multi-line edits
+#    - multi-line edits ### working on it -WWW
 #
 
 import pygame
+import tkinter
 import copy
 import math
+import re
 pygame.init()
 version = '2021-Dec-4'
-TRANSPARENT = pygame.Color(1, 1, 1)
+TRANSPARENT = pygame.Color(1, 1, 1, 1)
+# workaround, see https://github.com/pygame/pygame/issues/2887
+pygame.K_TILDE = ord('~')
+pygame.K_LBRACE = ord('{')
+pygame.K_RBRACE = ord('}')
+
+cursor_data = (
+    '#       ',
+    '##      ',
+    '#.#     ',
+    '#..#    ',
+    '#...#   ',
+    '#....#  ',
+    '#..#### ',
+    '#.#     ',
+    '##      ',
+    '#       ',
+    '        ',
+    '        ',
+    '        ',
+    '        ',
+    '        ',
+    '        ',
+)
+pygame.mouse.set_cursor(
+    (8, 16), (0, 0),
+    *pygame.cursors.compile(cursor_data, # data
+                           "X",          # black char
+                           ".",          # white char
+                           "#"           # XOR char
+                          ))
+
+def nop():
+    """Explicitly do nothing"""
+    pass
 
 class Point:
-
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -92,7 +129,7 @@ class Point:
 
     def max(self, other):
         return Point(max(self.x, other.x), max(self.y, other.y))
-    
+
     def min(self, other):
         return Point(min(self.x, other.x), min(self.y, other.y))
 
@@ -102,7 +139,7 @@ class Point:
         if isinstance(other, Point):
             return Point(self.x + other.x, self.y + other.y)
         return Point(self.x + other, self.y + other)
-        
+
     def __sub__(self, other):
         if isinstance(other, Point):
             return Point(self.x - other.x, self.y - other.y)
@@ -133,7 +170,7 @@ class Point:
 
     def dot_product(self, other):
         return self.x * other.x + self.y * other.y
-    
+
     def cross_product(self, other):
         return self.x * other.y - self.y * other.x
 
@@ -156,7 +193,7 @@ class Point:
             return Point(self.x*c+perp.x*s, self.y*c+perp.y*s)
         else:
             return NotImplemented
-    
+
     def flip(self, direction, center):
         """direction must be 'vertical' or 'horizontal'"""
 
@@ -172,7 +209,7 @@ class Point:
     @property
     def r(self):
         return math.sqrt(self.dot_product(self))
-    
+
     @property
     def theta(self):
         return math.atan(self.y/self.x)
@@ -194,9 +231,8 @@ class Point:
     @property
     def as_tuple(self):
         return (self.x, self.y)
-    
-class Rectangle:
 
+class Rectangle:
     def __init__(self, origin, corner):
         self.origin = origin
         self.corner = corner
@@ -305,9 +341,10 @@ class Rectangle:
 
     def inset_by(self, delta):
         return Rectangle(self.origin + delta, self.corner - delta)
-    
+
     def expand_by(self, integer):
-        return Rectangle(self.origin - integer, self.corner + integer)
+        return Rectangle(self.origin - integer,
+                         self.corner + integer)
 
     def intersect(self, aRectangle):
         return Rectangle(self.origin.max(aRectangle.origin),
@@ -316,15 +353,16 @@ class Rectangle:
     def merge(self, aRectangle):
         return Rectangle(self.origin.min(aRectangle.origin),
                          self.corner.max(aRectangle.corner))
-    
+
     # Rectangle testing:
 
     def contains_point(self, point):
         return self.origin <= point < self.corner
 
     def contains_rectangle(self, rect):
-        return (self.origin <= rect.origin and rect.corner <= self.corner)
-    
+        return (self.origin <= rect.origin and
+                rect.corner <= self.corner)
+
     contains_rect = contains_rectangle
 
     def intersects(self, rect):
@@ -340,10 +378,11 @@ class Rectangle:
     def scale_by(self, scale):
         """scale can be either a Point or a scalar"""
         return Rectangle(self.origin * scale, self.corner * scale)
-    
+
     def translate_by(self, factor):
         """factor can be either a Point or a scalar"""
-        return Rectangle(self.origin + factor, self.corner + factor)
+        return Rectangle(self.origin + factor,
+                         self.corner + factor)
 
     # Rectangle converting:
 
@@ -355,7 +394,6 @@ class Rectangle:
                            self.height)
 
 class Node:
-
     def __init__(self, name = 'node'):
         self.parent = None
         self.children = []
@@ -396,7 +434,7 @@ class Node:
         result = [self]
         for child in self.children:
             result.extend(child.all_children)
-        return result        
+        return result
 
     @property
     def all_leafs(self):
@@ -423,21 +461,65 @@ class Node:
         return result
 
     def parent_of_class(self, aClass):
-        """answer the first of my parents which is an instance of aClass"""
+        """answer the first of my parents which is an instance of
+        aClass"""
         for element in self.all_parents:
             if isinstance(element, aClass):
                 return element
         return None
 
     def child_of_class(self, aClass):
-        """answer the first of my children which is an instance of aClass"""
+        """answer the first of my children which is an instance of
+        aClass"""
         for element in self.all_children:
             if isinstance(element, aClass):
                 return element
         return None
 
-class Morph(Node):
+class Color:
+    def __init__(self, r=0, g=0, b=0, a=255):
+        self.r = r
+        self.g = g
+        self.b = b
+        self.a = a
+    
+    def __repr__(self):
+        return ('rgba(' +
+                str(round(self.r)) + ',' +
+                str(round(self.g)) + ',' +
+                str(round(self.b)) + ',' +
+                str(round(self.a)) + ')')
+    
+    @classmethod
+    def from_string(string):
+        return Color(*re.split(r"[\(),]", string)[1:5])
+    
+    def copy(self):
+        return Color(
+            self.r,
+            self.g,
+            self.b,
+            self.a
+        )
 
+    def __eq__(self, other):
+        return (isinstance(other, Color) and
+                self.r == other.r and
+                self.g == other.g and
+                self.b == other.b and
+                self.a == other.a)
+    
+    def is_close_to(self, other, threshold=10):
+        thres = 2.56 * threshold
+        def dist(a, b):
+            return abs(a - b) % 256
+        return (isinstance(other, Color) and
+                dist(self.r, other.r) <= thres and
+                dist(self.g, other.g) <= thres and
+                dist(self.b, other.b) <= thres and
+                dist(self.a, other.a) <= thres)
+
+class Morph(Node):
     def __init__(self):
         super(Morph, self).__init__()
         self.bounds = Rectangle(Point(0, 0), Point(50,40))
@@ -448,7 +530,7 @@ class Morph(Node):
         self.draw_new()
         self.fps = 0
         self.last_time = pygame.time.get_ticks()
-      
+
     def __repr__(self):
         return "a %s" % self.__class__.__name__
 
@@ -604,7 +686,8 @@ class Morph(Node):
         self.changed()
 
     def keep_within(self, morph):
-        """make sure I am completely within another morph's bounds"""
+        """make sure I am completely within another morph's
+        bounds"""
         left_off = self.full_bounds.left - morph.left
         if left_off < 0:
             self.move_by(Point(-left_off, 0))
@@ -636,6 +719,8 @@ class Morph(Node):
             p = area.origin.as_list
             area.origin = area.origin - self.bounds.origin
             area.corner = area.corner - self.bounds.origin
+            if isinstance(self, Text):
+                return
             surface.blit(self.image, p, area.as_pygame_rect)
 
     def full_draw_on(self, surface, rectangle=None):
@@ -675,6 +760,8 @@ class Morph(Node):
         img.set_alpha(self.alpha)
         for morph in self.all_children:
             pos = morph.position - self.position
+            if isinstance(morph, Text):
+                continue
             img.blit(morph.image, pos.as_list)
         return img
 
@@ -682,9 +769,12 @@ class Morph(Node):
         img = self.full_surface
         tmp = pygame.Surface(self.full_bounds.extent.as_list)
         sha = pygame.Surface(self.full_bounds.extent.as_list)
-        pygame.transform.threshold(tmp, img, (1,1,1))
+        pygame.transform.threshold(tmp, img, (1, 1, 1))
         tmp.blit(img, (-offset).as_list)
-        pygame.transform.threshold(sha, tmp, (0,0,0), (0,0,0), (1,1,1))
+        pygame.transform.threshold(sha, tmp,
+                                   (0, 0, 0),
+                                   (0, 0, 0),
+                                   (1, 1, 1))
         sha.set_colorkey(TRANSPARENT)
         sha.set_alpha(alpha)
         return sha
@@ -697,7 +787,8 @@ class Morph(Node):
         shadow.set_position(self.position + offset)
         return shadow
 
-    def add_shadow(self, name="shadow", offset=Point(7,7), alpha=50):
+    def add_shadow(self, name="shadow",
+                   offset=Point(7,7), alpha=50):
         shadow = self.shadow(offset, alpha)
         shadow.name = name
         self.add(shadow)
@@ -709,7 +800,7 @@ class Morph(Node):
             if isinstance (child, Shadow):
                 return child
         return None
-    
+
     def remove_shadow(self):
         self.full_changed()
         shadow = self.get_shadow
@@ -754,16 +845,16 @@ class Morph(Node):
         new = copy.copy(self)
         lst = []
         for m in self.children:
-            new_child = m.full_copy() 
+            new_child = m.full_copy()
             new_child.parent = new
             lst.append(new_child)
         new.children = lst
         return new
 
-    def duplicate(self):
+    def duplicate(self, world):
         clone = self.full_copy()
         clone.parent = None
-        clone.pick_up(self.world)
+        clone.pick_up(world)
 
     # Morph dragging and dropping:
 
@@ -853,7 +944,7 @@ class Morph(Node):
         menu = Menu(self, self.__class__.__name__)
         menu.add_item("pick up", 'pick_up', (self.world,))
         menu.add_item("attach...", 'choose_parent')
-        menu.add_item("duplicate", 'duplicate')
+        menu.add_item("duplicate", 'duplicate', (self.world,))
         menu.add_line()
         menu.add_item("inspect", 'inspect')
         menu.add_line()
@@ -870,12 +961,13 @@ class Morph(Node):
         menu.add_item("hide", 'hide')
         menu.add_item("delete", 'delete')
         return menu
-    
+
     def toggle_draggable(self):
         self.is_draggable = not self.is_draggable
 
     def choose_alpha(self):
-        result = self.prompt(self.__class__.__name__ + "\nalpha value:",
+        result = self.prompt(self.__class__.__name__ +
+                             "\nalpha value:",
                              str(self.alpha),
                              50)
         if result is not None:
@@ -884,7 +976,8 @@ class Morph(Node):
             self.changed()
 
     def choose_color(self):
-        result = self.pick_color(self.__class__.__name__ + "\ncolor:",
+        result = self.pick_color(self.__class__.__name__ +
+                                 "\ncolor:",
                                  self.color)
         if result is not None:
             self.color = result
@@ -915,7 +1008,7 @@ class Morph(Node):
     #         self.set_center(Point(*mousepos[0:2]))
     #         self.world.do_one_cycle()
     #     self.remove_shadow()
-        
+
     def choose_parent(self):
         self.choose_morph().add(self)
         self.changed()
@@ -925,6 +1018,12 @@ class Morph(Node):
         while pygame.mouse.get_pressed() == (0, 0, 0):
             self.world.do_one_cycle()
         return self.world.hand.morph_at_pointer
+
+    def keep_menu_up(self, menu):
+        menu.keep_menu_up()
+
+    def destroy_menu(self, menu):
+        menu.delete()
 
     # Morph utilities:
 
@@ -976,7 +1075,6 @@ class Morph(Node):
             return None
 
 class Resizer(Morph):
-
     def __init__(self, target=None):
         self.target = target
         super(Resizer, self).__init__()
@@ -1025,8 +1123,8 @@ class Resizer(Morph):
         while pygame.mouse.get_pressed() == (1, 0, 0):
             mousepos = pygame.mouse.get_pos()
             self.set_position(Point(*mousepos[0:2]) - offset)
-            self.target.change_extent_to(self.bottom_right
-                                         - self.target.bounds.origin)
+            self.target.change_extent_to(self.bottom_right -
+                                         self.target.bounds.origin)
             self.world.do_one_cycle()
 
 class Blinker(Morph):
@@ -1046,17 +1144,14 @@ class Blinker(Morph):
         self.toggle_visibility()
 
 class Shadow(Morph):
-
     def __init__(self):
         super(Shadow, self).__init__()
 
 class Widget(Morph):
-    
     def __init__(self):
         super(Widget, self).__init__()
 
 class ColorPalette(Morph):
-
     def __init__(self, target=None, size=Point(80, 50)):
         super(ColorPalette, self).__init__()
         self.target = target
@@ -1088,7 +1183,8 @@ class ColorPalette(Morph):
 
     def color_at(self, pos):
         if self.bounds.contains_point(pos):
-            return self.image.get_at((pos - self.bounds.origin).as_list)
+            return self.image.get_at((pos -
+                                      self.bounds.origin).as_list)
         else:
             return self.choice
 
@@ -1109,7 +1205,8 @@ class ColorPalette(Morph):
         self.update_target()
 
     def update_target(self):
-        if isinstance(self.target, Morph) and self.choice is not None:
+        if (isinstance(self.target, Morph) and
+            self.choice is not None):
             self.target.color = self.choice
             self.target.draw_new()
             self.target.changed()
@@ -1134,7 +1231,6 @@ class ColorPalette(Morph):
         self.is_draggable = False
 
 class GrayPalette(ColorPalette):
-
     def draw_new(self):
         """initialize my surface"""
         self.image = pygame.Surface(self.extent.as_list)
@@ -1148,7 +1244,6 @@ class GrayPalette(ColorPalette):
         self.image.unlock()
 
 class ColorPicker(Widget):
-
     def __init__(self, default=pygame.Color(255, 255, 255)):
         self.choice=default
         super(ColorPicker, self).__init__()
@@ -1188,9 +1283,8 @@ class ColorPicker(Widget):
     @property
     def root_for_grab(self):
         return self
-        
-class Ellipse(Morph):
 
+class Ellipse(Morph):
     def draw_new(self):
         """private - initialize my surface"""
         self.image = pygame.Surface(self.extent.as_tuple)
@@ -1202,7 +1296,7 @@ class Ellipse(Morph):
                             Rectangle(Point(0, 0),
                                       self.extent).as_pygame_rect,
                             0)
-    
+
 class Polygon(Morph):
     def __init__(self, vertices=None):
         self.set_vertices(vertices)
@@ -1286,7 +1380,8 @@ class Polygon(Morph):
             self.world.do_one_cycle()
         mousepos = pygame.mouse.get_pos()
         self.changed()
-        self.vertices.append(Point(*mousepos[0:2]) - self.bounds.origin)
+        self.vertices.append(Point(*mousepos[0:2]) -
+                             self.bounds.origin)
         self.set_vertices(self.vertices)
         self.draw_new()
         self.changed()
@@ -1304,7 +1399,7 @@ class CircleBox(Morph):
             self.orientation = 'vertical'
         else:
             self.orientation = 'horizontal'
-        
+
     def draw_new(self):
         self.auto_orientation()
         self.image = pygame.Surface(self.extent.as_list)
@@ -1365,7 +1460,6 @@ class CircleBox(Morph):
         self.changed()
 
 class SliderButton(CircleBox):
-
     def __init__(self):
         self.orientation = 'vertical'
         super(SliderButton, self).__init__()
@@ -1378,7 +1472,8 @@ class SliderButton(CircleBox):
         if self.orientation == 'vertical':
             if self.height > 8 and self.width > 4:
                 p1 = Point(2, self.center.y - self.top - 7)
-                p2 = Point(self.width - 4, self.center.y - self.top - 7)
+                p2 = Point(self.width - 4,
+                           self.center.y - self.top - 7)
                 for offset in range(0, 3):
                     p1 += Point(0, 3)
                     p2 += Point(0, 3)
@@ -1388,7 +1483,8 @@ class SliderButton(CircleBox):
                                      p2.as_list,
                                      2)
                 p1 = Point(2, self.center.y - self.top - 7)
-                p2 = Point(self.width - 4, self.center.y - self.top - 7)
+                p2 = Point(self.width - 4,
+                           self.center.y - self.top - 7)
                 for offset in range(1, 4):
                     p1 += Point(0, 3)
                     p2 += Point(0, 3)
@@ -1400,7 +1496,8 @@ class SliderButton(CircleBox):
         else:
             if self.width > 8 and self.height > 4:
                 p1 = Point(self.center.x - self.left - 7, 2 )
-                p2 = Point(self.center.x - self.left - 7, self.height - 4)
+                p2 = Point(self.center.x - self.left - 7,
+                           self.height - 4)
                 for offset in range(0, 3):
                     p1 += Point(3, 0)
                     p2 += Point(3, 0)
@@ -1410,7 +1507,8 @@ class SliderButton(CircleBox):
                                      p2.as_list,
                                      2)
                 p1 = Point(self.center.x - self.left - 7, 2 )
-                p2 = Point(self.center.x - self.left - 7, self.height - 4)
+                p2 = Point(self.center.x - self.left - 7,
+                           self.height - 4)
                 for offset in range(1, 4):
                     p1 += Point(3, 0)
                     p2 += Point(3, 0)
@@ -1471,7 +1569,8 @@ class Slider(CircleBox):
             pos_y = 0
             pos_x = min(int(self.value * self.unit_size),
                         self.width - self.button.width)
-        self.button.set_position(Point(pos_x, pos_y) + self.bounds.origin)
+        self.button.set_position(Point(pos_x, pos_y) +
+                                 self.bounds.origin)
         self.button.draw_new()
         self.button.changed()
 
@@ -1496,12 +1595,14 @@ class Slider(CircleBox):
                 if self.orientation == 'vertical':
                     new_x = self.button.bounds.origin.x
                     new_y = max(min(mousepos[1] - offset.y,
-                                    self.bottom - self.button.height),
+                                    self.bottom -
+                                    self.button.height),
                                 self.top)
                 else:
                     new_y = self.button.bounds.origin.y
                     new_x = max(min(mousepos[0] - offset.x,
-                                    self.right - self.button.width),
+                                    self.right -
+                                    self.button.width),
                                 self.left)
                 self.button.set_position(Point(new_x, new_y))
                 self.update_value()
@@ -1538,7 +1639,7 @@ class RoundedBox(Morph):
         """private"""
         fillrect = self.bounds.inset_by(inset)
         inner = fillrect.inset_by(edge)
-        
+
         for center in inner.corners:
             pygame.draw.circle(
                 self.image,
@@ -1615,8 +1716,33 @@ class Menu(RoundedBox):
             self.target = self
         self.items = []
         self.label = None
+        self.is_temporary = True
         super(Menu, self).__init__()
         self.is_draggable = False
+
+    def keep_menu_up(self):
+        self.is_temporary = False
+        self.add_shadow("shade", Point(2, 2), 80)
+        if self.world.is_dev_mode:
+            while ("keep this menu up", 'keep_menu_up',
+                   (self,)) in self.items:
+                self.items.remove(("keep this menu up",
+                                   'keep_menu_up',
+                                   (self,)))
+            while ("dismiss this menu", 'destroy_menu',
+                   (self,)) in self.items:
+                self.items.remove(("dismiss this menu",
+                                   'destroy_menu',
+                                   (self,)))
+            if self.is_temporary:
+                self.add_item("keep this menu up", 'keep_menu_up',
+                              (self,))
+            else:
+                self.add_item("dismiss this menu", 'destroy_menu',
+                              (self,))
+        self.keep_within(self.world)
+        self.draw_new()
+        self.full_changed()
 
     def add_item(self, label="close", action='nop', args=()):
         self.items.append((label, action, args))
@@ -1656,13 +1782,13 @@ class Menu(RoundedBox):
             if isinstance(child, MenuItem):
                 list.append(child)
         return list.index(item)
-       
-    def perform(self, item):
-        self.delete()
-        item.target.__getattribute__(item.action)(*item.args)
 
-    def nop(self):
-        pass
+    def perform(self, item):
+        item.target.__getattribute__(item.action)(*item.args)
+        if self.is_temporary:
+            self.delete()
+
+    nop = lambda self: nop
 
     def create_label(self):
         if self.label is not None:
@@ -1683,7 +1809,7 @@ class Menu(RoundedBox):
         self.label.draw_new()
         self.label.add(text)
         self.label.text = text
-        
+
     def draw_new(self):
         for m in self.children:
             m.delete()
@@ -1710,7 +1836,8 @@ class Menu(RoundedBox):
                 item.color = self.bordercolor
                 item.set_height(pair[1])
             else:
-                item = MenuItem(self.target, pair[1], pair[0], pair[2])
+                item = MenuItem(self.target, pair[1],
+                                pair[0], pair[2])
             item.set_position(Point(x, y))
             self.add(item)
             y += item.height + 1
@@ -1739,15 +1866,22 @@ class Menu(RoundedBox):
                 item.draw_new()
                 if item is self.label:
                     item.text.set_position(item.center -
-                                           (item.text.extent // 2))
+                                           item.text.extent // 2)
 
     def popup(self, world, pos):
-        self.draw_new()
         self.set_position(pos)
         self.add_shadow("shade", Point(2, 2), 80)
         self.keep_within(world)
         world.add(self)
-        world.open_menu = self
+        if world.is_dev_mode:
+            if self.is_temporary:
+                self.add_item("keep this menu up", 'keep_menu_up',
+                              (self,))
+            else:
+                self.add_item("dismiss this menu", 'destroy_menu',
+                              (self,))
+        self.draw_new()
+        # world.open_menus.append(self)
         self.full_changed()
         for item in self.items:
             if isinstance(item, StringField):
@@ -1755,18 +1889,27 @@ class Menu(RoundedBox):
                 return
 
     def popup_at_hand(self, world):
-        world.add(self)
+        # world.add(self)
         self.popup(world, world.hand.position)
 
     def popup_centered_at_hand(self, world):
-        world.add(self)
-        self.draw_new()
-        self.popup(world, (world.hand.position - (self.extent // 2)))
+        # world.add(self)
+        self.popup(world, world.hand.position - self.extent // 2)
 
     def popup_centered_in_world(self, world):
-        world.add(self)
-        self.draw_new()
-        self.popup(world, (world.center - (self.extent // 2)))
+        # world.add(self)
+        self.popup(world, world.center - self.extent // 2)
+
+    @property
+    def developers_menu(self):
+        menu = super(Menu, self).developers_menu
+        # menu.add_line()
+        # menu.add_item("go", 'toggle_motion')
+        return menu
+
+    @property
+    def handles_mouse_click(self):
+        return True
 
 class SelectionMenu(Menu):
     def __init__(self, target=None, title=None):
@@ -1788,7 +1931,6 @@ class SelectionMenu(Menu):
         return self.choice
 
 class ListMenu:
-
     def __init__(self,
                  list=None,
                  label=None,
@@ -1828,7 +1970,7 @@ class ListMenu:
         choice = self.menus[0].get_user_choice(world)
         while isinstance(choice, SelectionMenu):
             choice = choice.get_user_choice(world)
-        return choice        
+        return choice
 
 class Trigger(Morph):
     """basic button functionality"""
@@ -1884,7 +2026,8 @@ class Trigger(Morph):
                                  self.fontsize,
                                  self.bold,
                                  self.italic)
-        self.label.set_position(self.center - (self.label.extent // 2))
+        self.label.set_position(self.center -
+                                self.label.extent // 2)
         self.add(self.label)
 
     # Trigger events:
@@ -1931,8 +2074,9 @@ class MenuItem(Trigger, Widget):
         return True
 
     def mouse_click_left(self, pos):
-        if isinstance(self.parent, Menu):
-            self.world.open_menu = None
+        if (isinstance(self.parent, Menu) and
+            self.parent.is_temporary):
+            self.world.open_menus.remove(self.parent)
         self.parent.perform(self)
 
 class Bouncer(Morph):
@@ -1961,7 +2105,7 @@ class Bouncer(Morph):
 
     def step(self):
         if not self.is_stopped:
-            if self.type == "vertical":     
+            if self.type == "vertical":
                 if self.direction == "down":
                     self.move_down()
                 else:
@@ -1972,7 +2116,7 @@ class Bouncer(Morph):
                 if (self.full_bounds.bottom > self.parent.bottom
                     and self.direction == "down"):
                     self.direction = "up"
-            elif self.type == "horizontal":     
+            elif self.type == "horizontal":
                 if self.direction == "right":
                     self.move_right()
                 else:
@@ -2051,7 +2195,7 @@ class String(Morph):
         self.image = self.font.render(self.text, 1, self.color)
         self.image.set_alpha(self.alpha)
         corner = Point(self.image.get_width(),
-                                   self.image.get_height())
+                       self.image.get_height())
         self.bounds.corner = self.bounds.origin + corner
 
     # String menu:
@@ -2085,7 +2229,8 @@ class String(Morph):
             self.changed()
 
     def choose_font_size(self):
-        fontsize = self.prompt("Please enter the font size in points:",
+        fontsize = self.prompt("Please enter the font size in"
+                               " points:",
                                str(self.fontsize),
                                50)
         if fontsize is not None:
@@ -2156,7 +2301,7 @@ class TextCursor(Blinker):
             self.accept()
         elif code == pygame.K_ESCAPE:
             self.cancel()
-        elif pygame.K_SPACE <= code <= ord('~'):
+        elif pygame.K_SPACE <= code <= pygame.K_TILDE:
             self.insert(event.unicode)
 
     # TextCursor navigation:
@@ -2179,13 +2324,13 @@ class TextCursor(Blinker):
 
     def go_left(self):
         self.goto(self.pos - 1)
-        
+
     def go_right(self):
         self.goto(self.pos + 1)
 
     def go_home(self):
         self.goto(0)
-    
+
     def goto_end(self):
         self.goto(len(self.target.text))
 
@@ -2193,7 +2338,8 @@ class TextCursor(Blinker):
         idx = 0
         char_x = 0
         while point.x - self.target.left > char_x:
-            char_x += self.target.font.metrics(self.target.text)[idx][4]
+            char_x += \
+                self.target.font.metrics(self.target.text)[idx][4]
             idx += 1
         self.goto(idx - 1)
         self.show()
@@ -2215,7 +2361,7 @@ class TextCursor(Blinker):
         self.target.draw_new()
         self.target.changed()
         self.go_right()
-        
+
     def delete_right(self):
         self.target.changed()
         text = self.target.text
@@ -2231,33 +2377,32 @@ class TextCursor(Blinker):
         self.target.draw_new()
         self.go_left()
 
-class Text(Morph):
+class Text(String):
     """I am a multiline, word wrapping string"""
 
     def __init__(self,
                  text,
-                 fontname="verdana",
+                 fontname="arial",
                  fontsize=12,
                  bold=False,
                  italic=False,
-                 alignment='left',
+                 alignment="left",
                  width=0):
         pygame.font.init()
-        self.background_color = pygame.Color(255, 255, 255)
-        self.text = text
+        self.background_color = TRANSPARENT
         self.words = []
-        self.fontname = fontname
-        self.fontsize = fontsize
-        self.bold = bold
-        self.italic = italic
-        self.alignment=alignment
+        self.alignment = alignment
         self.max_width = width
-        super(Text, self).__init__()
+        super(Text, self).__init__(text, fontname,
+                                   fontsize, bold,
+                                   italic)
         self.color = pygame.Color(0, 0, 0)
+        self.alpha = 0
         self.draw_new()
 
     def __repr__(self):
-        return 'a Text("' + self.text + '")'
+        return ('a Text("' + self.text[:50] +
+                ('' if len(self.text) <=50 else '...') + '")')
 
     def parse(self):
         self.words = []
@@ -2276,8 +2421,9 @@ class Text(Morph):
         for word in self.words:
             if word == '\n':
                 self.lines.append(oldline)
-                self.max_line_width = max(self.max_line_width,
-                                          self.font.size(oldline)[0])
+                self.max_line_width = \
+                    max(self.max_line_width,
+                        self.font.size(oldline)[0])
                 oldline = ''
             else:
                 if self.max_width > 0:
@@ -2293,32 +2439,30 @@ class Text(Morph):
                         oldline = newline
                 else:
                     oldline = oldline + word + ' '
-    
+
     def draw_new(self):
-        surfaces = []
+        strings = []
         height = 0
         self.parse()
         for line in self.lines:
-            s = self.font.render(line, 1, self.color)
-            surfaces.append(s)
-            height += s.get_height()
+            s = String(line)
+            strings.append(s)
+            height += s.height
         if self.max_width == 0:
             self.set_extent(Point(self.max_line_width, height))
         else:
             self.set_extent(Point(self.max_width, height))
-        self.image = pygame.Surface(self.extent.as_list)
-        self.image.fill(self.background_color)
-        self.image.set_alpha(self.alpha)
         y = 0
-        for s in surfaces:
+        for s in strings:
             if self.alignment == 'right':
-                x = self.max_line_width - s.get_width()
+                x = self.max_line_width - s.width
             elif self.alignment == 'center':
-                x = (self.max_line_width - s.get_width()) // 2
+                x = (self.max_line_width - s.width) // 2
             else:
                 x = 0
-            self.image.blit(s, (x, y))
-            y += s.get_height()
+            s.set_position(Point(x, y))
+            s.draw_new()
+            y += s.height
 
     # Text menu:
 
@@ -2326,10 +2470,10 @@ class Text(Morph):
     def developers_menu(self):
         menu = super(Text, self).developers_menu
         menu.add_line()
-        menu.add_item("edit", 'edit_contents')
+        menu.add_item("edit", 'edit')
         menu.add_item("font name...", 'choose_font')
         menu.add_item("font size...", 'choose_font_size')
-        menu.add_item("background...", 'choose_background_color')
+        # menu.add_item("background...", 'choose_background_color')
         menu.add_line()
         if self.bold or self.italic:
             menu.add_item("normal", 'set_to_normal')
@@ -2355,7 +2499,8 @@ class Text(Morph):
             self.changed()
 
     def choose_font_size(self):
-        fontsize = self.prompt("please enter the font size in points:",
+        fontsize = self.prompt("please enter the font size in"
+                               " points:",
                                str(self.fontsize),
                                50)
         if fontsize is not None:
@@ -2364,23 +2509,24 @@ class Text(Morph):
             self.draw_new()
             self.changed()
 
-    def choose_background_color(self):
-        result = self.pick_color(self.__class__.__name__ + "\nbackground:",
-                            self.background_color)
-        if result is not None:
-            self.background_color = result
-            self.draw_new()
-            self.changed()
+    # def choose_background_color(self):
+    #     result = self.pick_color(self.__class__.__name__ +
+    #                              "\nbackground:",
+    #                              self.background_color)
+    #     if result is not None:
+    #         self.background_color = result
+    #         self.draw_new()
+    #         self.changed()
 
-    def edit_contents(self):
-        text = self.prompt("edit contents of text field:",
-                               self.text,
-                               400)
-        if text is not None:
-            self.text = text
-            self.changed()
-            self.draw_new()
-            self.changed()
+    # def edit_contents(self):
+    #     text = self.prompt("edit contents of text field:",
+    #                        self.text,
+    #                        400)
+    #     if text is not None:
+    #         self.text = text
+    #         self.changed()
+    #         self.draw_new()
+    #         self.changed()
 
     def set_alignment_to_left(self):
         self.set_alignment('left')
@@ -2460,8 +2606,8 @@ class Hand(Morph):
     def morph_at_pointer(self):
         morphs = self.world.children
         for m in morphs[::-1]:
-            if (m.full_bounds.contains_point(self.bounds.origin) and not
-                isinstance(m, Shadow) and m.is_visible):
+            if (m.full_bounds.contains_point(self.bounds.origin)
+                and not isinstance(m, Shadow) and m.is_visible):
                 return m.morph_at(self.bounds.origin)
         return self.world
 
@@ -2470,8 +2616,8 @@ class Hand(Morph):
         answer = []
         morphs = self.world.all_children
         for m in morphs:
-            if m.is_visible and (m.full_bounds.contains_point
-                                 (self.bounds.origin)):
+            if (m.is_visible and
+                m.full_bounds.contains_point(self.bounds.origin)):
                 answer.append(m)
         return answer
 
@@ -2491,7 +2637,7 @@ class Hand(Morph):
             self.changed()
 
     def drop(self):
-        if self.children != []:
+        if len(self.children):
             morph = self.children[0]
             target = self.drop_target_for(morph)
             self.changed()
@@ -2504,27 +2650,31 @@ class Hand(Morph):
     # Hand event dispatching:
 
     def process_mouse_down(self, event):
-        if self.children != []:
+        if len(self.children):
             self.drop()
         else:
             pos = Point(*event.pos[0:2])
             morph = self.morph_at_pointer
 
-            is_menu_click = False
-            for m in morph.all_parents:
-                if isinstance(m, Menu) or isinstance(m, Widget):
-                    is_menu_click = True
-            if not is_menu_click:
-                if isinstance(self.world.open_menu, SelectionMenu):
-                    self.world.open_menu.choice = False
-                elif isinstance(self.world.open_menu, Menu):
-                    self.world.open_menu.delete()
+            # is_menu_click = False
+            # for m in morph.all_parents:
+            #     if isinstance(m, Menu):
+            #         is_menu_click = True
+            for menu in self.world.open_menus:
+                if menu in self.all_morphs_at_pointer:
+                    continue
+                if isinstance(menu, SelectionMenu):
+                    menu.choice = False
+                elif (isinstance(menu, Menu) and
+                      menu.is_temporary):
+                    menu.delete()
 
             if self.world.text_cursor is not None:
                 if morph is not self.world.text_cursor.target:
                     self.world.stop_editing()
 
             self.morph_to_grab = morph.root_for_grab
+            # print(morph.all_parents)
             while not morph.handles_mouse_click:
                 morph = morph.parent
             self.mouse_down_morph = morph
@@ -2538,7 +2688,7 @@ class Hand(Morph):
                 pass
 
     def process_mouse_up(self, event):
-        if self.children != []:
+        if len(self.children):
             self.drop()
         else:
             pos = Point(*event.pos[0:2])
@@ -2546,14 +2696,17 @@ class Hand(Morph):
 
             is_menu_click = False
             for m in morph.all_parents:
-                if isinstance(m, Menu) or isinstance(m, Widget):
+                if (isinstance(m, Menu) or
+                    isinstance(m, Widget)):
                     is_menu_click = True
 
-            if event.button == pygame.BUTTON_RIGHT and not is_menu_click:
+            if (event.button == pygame.BUTTON_RIGHT and not
+                is_menu_click):
                 menu = morph.context_menu
                 if menu is not None:
                     menu.popup_at_hand(self.world)
-            
+                    self.world.open_menus.append(menu)
+
             while not morph.handles_mouse_click:
                 morph = morph.parent
             if event.button == pygame.BUTTON_LEFT:
@@ -2564,7 +2717,8 @@ class Hand(Morph):
                 morph.mouse_up_middle(pos)
                 if morph is self.mouse_down_morph:
                     morph.mouse_click_middle(pos)
-            elif event.button == pygame.BUTTON_RIGHT and not is_menu_click:
+            elif (event.button == pygame.BUTTON_RIGHT and not
+                  is_menu_click):
                 morph.mouse_up_right(pos)
                 if morph is self.mouse_down_morph:
                     morph.mouse_click_right(pos)
@@ -2573,7 +2727,8 @@ class Hand(Morph):
 
     def process_mouse_move(self, event):
         mouse_over_new = self.all_morphs_at_pointer
-        if self.children == [] and event.buttons[0] == pygame.BUTTON_LEFT:
+        if (self.children == [] and
+            event.buttons[0] == pygame.BUTTON_LEFT):
             top_morph = self.morph_at_pointer
             if top_morph.handles_mouse_move:
                 pos = Point(*event.pos[0:2])
@@ -2582,12 +2737,14 @@ class Hand(Morph):
             if morph is self.morph_to_grab and morph.is_draggable:
                 self.grab(morph)
         for old in self.mouse_over_list:
-            if old not in mouse_over_new and old.handles_mouse_over:
+            if (old not in mouse_over_new and
+                old.handles_mouse_over):
                 old.mouse_leave()
                 if event.buttons[0] == pygame.BUTTON_LEFT:
                     old.mouse_leave_dragging()
-        for new in mouse_over_new: 
-            if new not in self.mouse_over_list and new.handles_mouse_over:
+        for new in mouse_over_new:
+            if (new not in self.mouse_over_list and
+                new.handles_mouse_over):
                 new.mouse_enter()
                 if event.buttons[0] == pygame.BUTTON_LEFT:
                     new.mouse_enter_dragging()
@@ -2596,10 +2753,10 @@ class Hand(Morph):
     # Hand testing:
 
     def is_dragging(self, morph):
-        if self.children != []:
+        if len(self.children):
             return morph is self.children[0]
         else:
-            return False        
+            return False
 
 class Frame(Morph):
     """I clip my submorphs at my bounds"""
@@ -2625,13 +2782,15 @@ class Frame(Morph):
                 child.full_draw_on(surface, rectangle)
             else:
                 child.full_draw_on(surface,
-                                   self.bounds.intersect(rectangle))
+                                   self.bounds.intersect(rectangle)
+                                  )
 
     @property
     def developers_menu(self):
         menu = super(Frame, self).developers_menu
         menu.add_line()
-        menu.add_item("move all inside", 'keep_all_submorphs_within')
+        menu.add_item("move all inside",
+                      'keep_all_submorphs_within')
         return menu
 
     def keep_all_submorphs_within(self):
@@ -2688,7 +2847,7 @@ class StringField(Frame, Widget):
 
 class World(Frame):
     """I represent the screen"""
-                      
+
     def __init__(self, x=800, y=600):
         super(World, self).__init__()
         self.hand = Hand()
@@ -2697,7 +2856,7 @@ class World(Frame):
         self.text_cursor = None
         self.bounds = Rectangle(Point(0, 0), Point(x, y))
         self.color = pygame.Color(130, 130, 130)
-        self.open_menu = None
+        self.open_menus = []
         self.is_visible = True
         self.is_draggable = False
         self.is_dev_mode = True
@@ -2727,10 +2886,8 @@ class World(Frame):
 
     def add(self, morph):
         if isinstance(morph, Menu):
-            if isinstance(self.open_menu, Menu):
-                self.open_menu.delete()
+            self.open_menus.append(morph)
         super(World, self).add(morph)
-        self.open_menu = morph
 
     # World displaying:
 
@@ -2766,20 +2923,26 @@ class World(Frame):
     def context_menu(self):
         menu = Menu(self, self.__class__.__name__)
         if self.is_dev_mode:
-            menu.add_item("create a morph...", 'user_create_new_morph')
+            menu.add_item("create a morph...",
+                          'user_create_new_morph')
             menu.add_line()
             menu.add_item("hide all", 'hide_all')
             menu.add_item("show all", 'show_all_hiddens')
-            menu.add_item("move all inside", 'keep_all_submorphs_within')
+            menu.add_item("move all inside",
+                          'keep_all_submorphs_within')
+            menu.add_line()
+            menu.add_item("inspect", 'inspect')
             menu.add_item("color...", 'choose_color')
             menu.add_line()
             menu.add_item("stop all bouncers", 'stop_all_bouncers')
-            menu.add_item("start all bouncers", 'start_all_bouncers')
+            menu.add_item("start all bouncers",
+                          'start_all_bouncers')
             menu.add_line()
             menu.add_item("switch to user mode", 'toggle_dev_mode')
-            menu.add_item("close", 'delete')
+            menu.add_item("exit", 'delete')
         else:
-            menu.add_item("enter developer's mode", 'toggle_dev_mode')
+            menu.add_item("enter developer mode",
+                          'toggle_dev_mode')
         menu.add_line()
         menu.add_item("about...", 'about')
         return menu
@@ -2793,13 +2956,13 @@ class World(Frame):
         menu.add_item("polygon...", 'user_create_polygon')
         menu.add_line()
         menu.add_item("string...", 'user_create_string')
-        menu.add_item("text...", 'user_create_text')
+        menu.add_item("multiline text...", 'user_create_text')
         menu.add_line()
         menu.add_item("bouncer...", 'user_create_bouncer')
         menu.add_item("frame...", 'user_create_frame')
         menu.add_item("palette...", 'user_create_color_palette')
         menu.add_item("slider...", 'user_create_slider')
-        
+
         menu.popup_at_hand(self)
 
     def user_create_rectangle(self):
@@ -2824,7 +2987,8 @@ class World(Frame):
         box.pick_up(self)
 
     def user_create_polygon(self):
-        self.hint('left click to add vertices,\nmiddle click to complete')
+        self.hint('left click to add vertices,\n'
+                  'middle click to complete')
         oldpos = None
         vertices = []
         while pygame.mouse.get_pressed() != (0, 1, 0):
@@ -2850,20 +3014,20 @@ class World(Frame):
         string.pick_up(self)
 
     def user_create_text(self):
-        text = Text("Ich weiß nicht, was soll es bedeuten, das ich so "
-                    "traurig bin, ein Märchen aus uralten Zeiten, das "
-                    "kommt mir nicht aus dem Sinn. Die Luft ist kühl und "
-                    "es dunkelt, und ruhig fließt der Rhein; der Gipfel "
-                    "des Berges funkelt im Abendsonnenschein. Die "
-                    "schönste Jungfrau sitzet dort oben wunderbar, ihr "
-                    "gold'nes Geschmeide blitzet, sie kämmt ihr goldenes "
-                    "Haar, sie kämmt es mit goldenem Kamme, und singt ein "
-                    "Lied dabei; das hat eine wundersame, gewalt'ge "
-                    "Melodei. Den Schiffer im kleinen Schiffe, ergreift "
-                    "es mit wildem Weh; er schaut nicht die Felsenriffe, "
-                    "er schaut nur hinauf in die Höh'. Ich glaube, die "
-                    "Wellen verschlingen am Ende Schiffer und Kahn, und "
-                    "das hat mit ihrem Singen, die Loreley getan.")
+        text = Text("Ich weiß nicht, was soll es bedeuten, das "
+        "ich so traurig bin, ein Märchen aus uralten Zeiten, das "
+        "kommt mir nicht aus dem Sinn. Die Luft ist kühl und es "
+        "dunkelt, und ruhig fließt der Rhein; der Gipfel des "
+        "Berges funkelt im Abendsonnenschein. Die schönste "
+        "Jungfrau sitzet dort oben wunderbar, ihr gold'nes "
+        "Geschmeide blitzet, sie kämmt ihr goldenes Haar, sie "
+        "kämmt es mit goldenem Kamme, und singt ein Lied dabei; "
+        "das hat eine wundersame, gewalt'ge Melodei. Den Schiffer "
+        "im kleinen Schiffe, ergreift es mit wildem Weh; er "
+        "schaut nicht die Felsenriffe, er schaut nur hinauf in "
+        "die Höh'. Ich glaube, die Wellen verschlingen am Ende "
+        "Schiffer und Kahn, und das hat mit ihrem Singen, die "
+        "Loreley getan.")
         text.max_width = 400
         text.draw_new()
         text.pick_up(self)
@@ -2901,7 +3065,7 @@ class World(Frame):
     # World methods:
 
     def delete(self):
-        if self.ask_yes_no("Ae you sure you want to quit?"):
+        if self.ask_yes_no("Are you sure you want to quit?"):
             self.is_quitting = True
 
     def toggle_dev_mode(self):
@@ -2955,11 +3119,13 @@ class World(Frame):
     def step_frame(self):
         event = pygame.event.poll()
         if event.type != 0:
-            if event.type in range(pygame.MOUSEMOTION, pygame.MOUSEWHEEL):
+            if (event.type in
+                range(pygame.MOUSEMOTION, pygame.MOUSEWHEEL)):
                 self.hand.process_mouse_event(event)
             elif (event.type == pygame.KEYDOWN and
                   self.keyboard_receiver is not None):
-                self.keyboard_receiver.process_keyboard_event(event)
+                self.keyboard_receiver. \
+                    process_keyboard_event(event)
             elif event.type == pygame.QUIT:
                 return "quit"
             # elif event.type == 16:
@@ -2993,3 +3159,6 @@ class World(Frame):
         self.update_broken()
         if self.fps > 0:
             self.wait_for_next_frame()
+
+if __name__ == '__main__':
+    World(610, 314).loop()

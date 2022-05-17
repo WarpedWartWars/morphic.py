@@ -1,2 +1,2 @@
-language = "pygame"
-run = "python main.py"
+language = "python"
+run = "python morphic.py"
