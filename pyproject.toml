@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "repl_pygame_morphicpy-1"
-version = "0.1.0"
+name = "morphic.py"
+version = "2021-Dec-4"
 description = ""
-authors = ["WarpedWartWars <<>>"]
+authors = ["WarpedWartWars"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-pygame = "^2.0.2"
+python = "^3.10"
+pygame = "^2.1.2"
 
 [tool.poetry.dev-dependencies]
 

@@ -385,7 +385,7 @@ class Node:
 
     @property
     def depth(self):
-        if self.parent == None:
+        if self.parent is None:
             return 0
         else:
             return self.parent.depth + 1
@@ -629,7 +629,7 @@ class Morph(Node):
     def draw_on(self, surface, rectangle=None):
         if not self.is_visible:
             return
-        if rectangle == None:
+        if rectangle is None:
             rectangle = self.bounds
         area = rectangle.intersect(self.bounds)
         if area.extent > Point(0,0):
@@ -641,7 +641,7 @@ class Morph(Node):
     def full_draw_on(self, surface, rectangle=None):
         if not self.is_visible:
             return
-        if rectangle == None:
+        if rectangle is None:
             rectangle = self.full_bounds
         self.draw_on(surface, rectangle)
         for child in self.children:
@@ -659,11 +659,12 @@ class Morph(Node):
         for morph in self.children:
             morph.show()
 
-    def toggle_visibility(self):
-        self.is_visible = not self.is_visible
+    def toggle_visibility(self, v=None):
+        self.is_visible = (v if v is not None
+                             else not self.is_visible)
         self.changed()
         for morph in self.children:
-            morph.toggle_visibility()
+            morph.toggle_visibility(self.is_visible)
 
     # Morph conversion:
 
@@ -769,7 +770,7 @@ class Morph(Node):
 
     @property
     def root_for_grab(self):
-        if (self.parent == None or
+        if (self.parent is None or
             isinstance(self.parent, Frame)):
             return self
         else:
@@ -1611,7 +1612,7 @@ class Menu(RoundedBox):
     def __init__(self, target=None, title=None):
         self.target = target
         self.title = title
-        if target == None:
+        if target is None:
             self.target = self
         self.items = []
         self.label = None
@@ -1782,7 +1783,7 @@ class SelectionMenu(Menu):
     def get_user_choice(self, world):
         self.choice = None
         self.popup_at_hand(world)
-        while self.choice == None:
+        while self.choice is None:
             world.do_one_cycle()
         self.delete()
         return self.choice
@@ -2616,7 +2617,7 @@ class Frame(Morph):
         return True
 
     def full_draw_on(self, surface, rectangle=None):
-        if rectangle == None:
+        if rectangle is None:
             rectangle = self.full_bounds
         rectangle = rectangle.intersect(self.full_bounds)
         self.draw_on(surface, rectangle)
@@ -2735,7 +2736,7 @@ class World(Frame):
     # World displaying:
 
     def full_draw_on(self, surface, rectangle=None):
-        if rectangle == None:
+        if rectangle is None:
             rectangle = self.bounds
         if rectangle.extent > Point(0, 0):
             self.image.fill(self.color, rectangle.as_pygame_rect)
